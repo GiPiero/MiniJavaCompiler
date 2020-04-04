@@ -15,11 +15,11 @@ public class Scan {
 		final String in_file;
 		int errs = 0;
 		Token t;
-
-		if (args.length = 1) { 
+		
+		if (args.length == 1) { 
 			in_file = args[0];
 	       		verbose = false;
-		} else if (args.length = 2 && args[0] == "-v") {
+		} else if (args.length == 2 && args[0].equals("-v")) {
 			in_file = args[1];
 			verbose = true;
 		} else {
@@ -27,7 +27,7 @@ public class Scan {
 			return;
 		}
 
-		try { lexer = new MiniJavaScanner (new FileInputStream(args[0]));} 
+		try { lexer = new MiniJavaScanner (new FileInputStream(in_file));} 
 		catch (Exception e) { System.out.println(e); return; }
 
 		do {
@@ -37,16 +37,16 @@ public class Scan {
 				case INVALID:
 					errs += 1;
 					System.err.printf("%s:%03d.%03d: ERROR -- illegal character %s\n", 
-							args[0], t.beginLine, t.beginColumn, t.image);
+							in_file, t.beginLine, t.beginColumn, t.image);
 					break;
 				default:
 					if ( verbose )
 						System.out.printf("%s:%03d.%03d: %s \"%s\"\n", 
-								args[0], t.beginLine, t.beginColumn, 
+								in_file, t.beginLine, t.beginColumn, 
 								t_map.get(t.kind), t.image);
 			}
 		} while (t.kind != EOF);
 
-		System.out.println("filename=" + args[0] + ", errors=" + errs);
+		System.out.println("filename=" + in_file + ", errors=" + errs);
 	}
 }
