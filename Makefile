@@ -14,8 +14,9 @@ scan.jar:
 	jar cfe $@ main.Scan main/*.class parser/*.class global/*.class
 
 clean:
-	-/bin/rm *~ */*~
-	-/bin/rm */*.class
+	-/bin/rm -f *.class
+	-/bin/rm -f */*.class
+	-/bin/rm -f scan.jar
 
 clean_all:
-	-/bin/rm */scan.jar
+	-/bin/rm -f parser/*.java
