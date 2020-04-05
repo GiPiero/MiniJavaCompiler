@@ -4,19 +4,19 @@ JAVACC:= javacc
 
 default	:	compiler
 
-compiler:	scanner.jj scan.jar
+compiler:	parser.jj parse.jar
 
-scanner.jj:
+parser.jj:
 	$(JAVACC) -OUTPUT_DIRECTORY=parser parser/*.jj
 
-scan.jar:
+parse.jar:
 	$(JAVAC) */*.java
-	jar cfe $@ main.Scan main/*.class parser/*.class global/*.class
+	jar cfe $@ main.Parse main/*.class parser/*.class global/*.class
 
 clean:
 	-/bin/rm -f *.class
 	-/bin/rm -f */*.class
-	-/bin/rm -f scan.jar
+	-/bin/rm -f parse.jar
 
 clean_all:
 	-/bin/rm -f parser/*.java

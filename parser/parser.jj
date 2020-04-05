@@ -1,0 +1,361 @@
+PARSER_BEGIN(MiniJavaParser)
+package parser;
+public class MiniJavaParser{
+	public static int errors = 0;
+	public static String in_file = null;
+}
+PARSER_END(MiniJavaParser)
+
+// Lexical Stuff
+
+TOKEN : {
+	< IF:	"if">				//  Keywords
+	| < ELSE: "else" >
+	| < CLASS: "class" >
+	| < PUBLIC: "public" >
+	| < STATIC: "static" >
+	| < VOID: "void" >
+	| < MAIN: "main" >
+	| < STRING: "String" >
+	| < EXTENDS: "extends" >
+	| < RETURN: "return" >
+	| < INT: "int" >
+	| < BOOLEAN: "boolean" >
+	| < WHILE: "while" >
+	| < TRUE: "true" >
+	| < FALSE: "false" >
+	| < THIS: "this" >
+	| < NEW: "new" >
+	| < LENGTH: "length" >
+	| < PRINTLN: "System.out.println" >
+	| < AND: "&&" >				// Operators
+	| < LESSTHAN: "<" >
+	| < PLUS: "+" >
+	| < MINUS: "-" >
+	| < MULT: "*" >
+	| < NOT: "!" >
+	| < DOT: "." >
+	| < GETS: "=" >
+	| < LBRACE: "{" >			// Seperators
+	| < RBRACE: "}" >
+	| < LBRACKET: "[" >
+	| < RBRACKET: "]" >
+	| < LPAREN: "(" >
+	| < RPAREN: ")" >
+	| < SEMICOLON: ";" >
+	| < COMMA: "," >
+	| < IDENTIFIER: (<LETTER>) ("_" | <LETTER> | <DIGIT>)* >
+	| < INTEGER_LITERAL: (<DIGIT>)+ >
+	| < #LETTER: ["a" - "z", "A" - "Z"] >
+	| < #DIGIT: ["0" - "9"] >
+	| < INVALID: (~[ "\t", " ", "\n", "\r"]) >
+}
+
+SKIP : {
+	" "
+	| "\t"
+	| "\n"
+	| "\r"
+	| "/*": COMMENT 
+}
+
+< COMMENT > SKIP: {
+	< ~[] >
+	| "*/": DEFAULT
+}
+
+// Program expansions
+void Program():
+{}
+{	try {
+		MainClass() ( ClassDecl() )* <EOF>
+	} catch(ParseException e) {
+		syntax_error(e);
+	}
+}
+
+void MainClass():
+{}
+{
+	"class" <IDENTIFIER> "{" 
+	"public" "static" "void" "main" 
+	"(" "String" "[" "]" <IDENTIFIER> ")"
+	"{" Statement() "}" "}"
+}
+
+void ClassDecl():
+{}
+{
+	LOOKAHEAD(3) ExtendedClassDecl()
+	| 
+	RootClassDecl()   
+}
+
+void RootClassDecl():
+{}
+{
+	"class" <IDENTIFIER> "{" ( VarDecl() )* ( MethodDecl() )* "}"
+}
+
+void ExtendedClassDecl():
+{}
+{
+	"class" <IDENTIFIER> "extends" <IDENTIFIER> "{" ( VarDecl() )* ( MethodDecl() )* "}"
+}
+
+void VarDecl():
+{}
+{
+	Type() <IDENTIFIER> ";"
+}
+
+// Method declaration expansions
+void MethodDecl():
+{}
+{
+	"public" Type() <IDENTIFIER> "(" ( ParamDeclList() )? ")" "{"
+	( LOOKAHEAD(2) VarDecl() )* ( Statement() )*
+	"return" Expression() ";" "}"
+}
+
+void ParamDeclList():
+{}
+{
+	ParamDecl() ( ParamDeclListTail() )*
+}
+
+void ParamDeclListTail():
+{}
+{
+	"," ParamDecl()
+}
+
+void ParamDecl():
+{}
+{
+	Type() <IDENTIFIER>
+}
+
+void Type():
+{}
+{
+	LOOKAHEAD(3) "int" "[" "]"
+	| "boolean"
+	| "int"
+	| <IDENTIFIER> 
+}
+
+// Statement expansions
+void Statement():
+{}
+{
+	try {
+		(
+		Block()
+		| IfStatement()
+		| WhileStatement()
+		| PrintCall()
+		| LOOKAHEAD(2) Assignment()
+		| ArrayAssignment()
+		)
+	} catch(ParseException e) {
+		syntax_error(e);
+		skip_to_expected(e.expectedTokenSequences);
+	}
+}
+
+void Block():
+{}
+{	try {
+		"{" ( Statement() )* "}"
+	} catch(ParseException e){
+		syntax_error(e);
+		skip_to_expected(e.expectedTokenSequences);
+	}
+}
+
+void IfStatement():
+{}
+{/*
+	LOOKAHEAD(IfElseStatement()) IfElseStatement()
+	| IfThenStatement()	
+}
+
+void IfThenStatement():
+{}
+{
+	"if" "(" Expression() ")" Statement()
+}
+
+void IfElseStatement():
+{}
+{*/	
+	"if" "(" Expression() ")" Statement() "else" Statement()
+}
+
+void WhileStatement():
+{}
+{
+	"while" "(" Expression() ")" Statement()
+}
+
+void PrintCall():
+{}
+{
+	<PRINTLN> "(" Expression() ")" ";"
+}
+
+void Assignment():
+{}
+{
+	<IDENTIFIER> "=" Expression() ";"
+}
+
+void ArrayAssignment():
+{}
+{
+	<IDENTIFIER> "[" Expression() "]" "=" Expression() ";"
+}
+
+// Expression expansions
+void Expression():
+{}
+{
+	LOOKAHEAD(SubExpression() "&&") AndExpr()
+	| LOOKAHEAD(SubExpression() "<") CompareExpr()
+	| LOOKAHEAD(SubExpression() "+") PlusExpr()
+	| LOOKAHEAD(SubExpression() "-") MinusExpr()
+	| LOOKAHEAD(SubExpression() "*") MultExpr()
+	| LOOKAHEAD(SubExpression() "[") ArrayLookupExpr()
+	| LOOKAHEAD(SubExpression() "." "length") LengthExpr()
+	| LOOKAHEAD(SubExpression() "." <IDENTIFIER> "(" ) FunctionCall()
+	| SubExpression()
+}
+
+void AndExpr():
+{}
+{
+	SubExpression() "&&" SubExpression()
+}
+
+void CompareExpr():
+{}
+{
+	SubExpression() "<" SubExpression()
+}
+
+void PlusExpr():
+{}
+{
+	SubExpression() "+" SubExpression()
+}
+
+void MinusExpr():
+{}
+{	SubExpression() "-" SubExpression()
+
+}
+
+void MultExpr():
+{}
+{
+	SubExpression() "*" SubExpression()
+}
+
+void ArrayLookupExpr():
+{}
+{
+	SubExpression() "[" SubExpression() "]"
+}
+
+void LengthExpr():
+{}
+{
+	SubExpression() "." "length"
+}
+
+void FunctionCall():
+{}
+{
+	SubExpression() "." <IDENTIFIER> "(" ( MethodParams() )? ")"
+}
+
+void MethodParams():
+{}
+{
+	Expression() ( MethodParamsTail() )*
+}
+
+void MethodParamsTail():
+{}
+{
+	"," Expression()
+}
+
+void SubExpression():
+{}
+{
+	<INTEGER_LITERAL>
+	| "true"
+	| "false"
+	| "this"
+	| LOOKAHEAD(2) "new" "int" "[" Expression() "]"
+	| "new" <IDENTIFIER> "(" ")"
+	| "!" Expression()
+	| "(" Expression() ")"
+	| <IDENTIFIER>
+}
+
+JAVACODE
+void syntax_error(ParseException e){
+	Token t = e.currentToken.next;
+	int exp = -1;
+
+	errors = errors + 1;
+	
+	for(int i = 0; exp == -1 && i < e.expectedTokenSequences.length; i++)
+		for(int j = 0; exp == -1 && j < e.expectedTokenSequences[i].length; j++)
+			exp = e.expectedTokenSequences[i][j];
+	if (exp != -1)
+        	System.err.printf("%s:%03d.%03d: Syntax Error: expecting a %s\n",
+                	in_file, t.beginLine, t.beginColumn,
+			e.tokenImage[exp]);
+	else
+		System.err.printf("%s:%03d.%03d: Syntax Error: unknown\n",
+                        in_file, t.beginLine, t.beginColumn);
+}
+
+JAVACODE
+void skip_to_matching_brace(){
+	Token t;
+	int depth = 1;
+	while (true) {
+		t = getToken(1);
+		if(t.kind == LBRACE) depth++;
+		if(t.kind == RBRACE) {
+			depth--;
+			if(depth == 0) break;
+		}
+		if(t.kind == EOF) break;
+		t = getNextToken();
+	}
+}
+
+JAVACODE
+void skip_to_kind(int kind) {
+	Token t;
+	do {
+		t = getNextToken();
+	} while (t.kind != kind && t.kind != EOF);
+}
+
+JAVACODE
+void skip_to_expected(int [][] expected){
+	Token t;
+	do {
+		t = getNextToken();
+		for (int i = 0; i < expected.length; i++)
+			if(t.kind == EOF || t.kind == expected[i][0])
+				return;
+	} while(true);
+}
