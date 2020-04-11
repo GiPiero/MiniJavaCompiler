@@ -1,9 +1,10 @@
 PARSER_BEGIN(MiniJavaParser)
 package parser;
-public class MiniJavaParser{
-	public static int errors = 0;
-	public static String in_file = null;
-}
+import java.util.ArrayList;
+import syntax.*;
+import main.CompileError;
+
+public class MiniJavaParser{}
 PARSER_END(MiniJavaParser)
 
 // Lexical Stuff
@@ -65,117 +66,175 @@ SKIP : {
 }
 
 // Program expansions
-void Program():
-{}
-{	try {
-		MainClass() ( ClassDecl() )* <EOF>
+Program JProgram():
+{ MainClass m; ArrayList<ClassDecl> cl = new ArrayList<ClassDecl>(); }
+{	
+	try {
+		m = JMainClass() ( cl = JClassDeclList() )? <EOF>
+		{ return new Program(m, cl); }
 	} catch(ParseException e) {
 		syntax_error(e);
+		return null;
 	}
 }
 
-void MainClass():
-{}
+MainClass JMainClass():
+{ Identifier cn; Identifier arg; Statement s; }
 {
-	"class" <IDENTIFIER> "{" 
+	"class" cn = JIdentifier() "{" 
 	"public" "static" "void" "main" 
-	"(" "String" "[" "]" <IDENTIFIER> ")"
-	"{" Statement() "}" "}"
+	"(" "String" "[" "]" arg = JIdentifier() ")"
+	"{" s = JStatement() "}" "}"
+	{ return new MainClass(cn, arg, s); }
 }
 
-void ClassDecl():
-{}
+ArrayList<ClassDecl> JClassDeclList():
+{ ClassDecl cd;	ArrayList<ClassDecl> cl = new ArrayList<ClassDecl>(); }
 {
-	LOOKAHEAD(3) ExtendedClassDecl()
+	cd = JClassDecl() { cl = new ArrayList<ClassDecl>(); cl.add(cd); }
+	( cd = JClassDecl() { cl.add(cd); } )*
+	{ return cl; }
+}
+
+ClassDecl JClassDecl():
+{ ClassDecl cd; }
+{
+	LOOKAHEAD(3) cd = JExtendedClassDecl() 
+	{ return cd; }
 	| 
-	RootClassDecl()   
+	cd = JRootClassDecl() 
+	{ return cd; }
 }
 
-void RootClassDecl():
-{}
+SimpleClassDecl JRootClassDecl():
+{ Identifier cn; ArrayList<VarDecl> vl = new ArrayList<VarDecl>(); ArrayList<MethodDecl> ml = new ArrayList<MethodDecl>(); }
 {
-	"class" <IDENTIFIER> "{" ( VarDecl() )* ( MethodDecl() )* "}"
+	"class" cn = JIdentifier() 
+	"{" ( vl = JVarDeclList() )? ( ml = JMethodDeclList() )? "}"
+	{ return new SimpleClassDecl(cn, vl, ml); }
 }
 
-void ExtendedClassDecl():
-{}
+ExtendingClassDecl JExtendedClassDecl():
+{ Identifier cn; Identifier scn; ArrayList<VarDecl> vl = new ArrayList<VarDecl>(); ArrayList<MethodDecl> ml = new ArrayList<MethodDecl>(); }
 {
-	"class" <IDENTIFIER> "extends" <IDENTIFIER> "{" ( VarDecl() )* ( MethodDecl() )* "}"
+	"class" cn = JIdentifier() "extends" scn = JIdentifier() 
+	"{" ( vl = JVarDeclList() )? ( ml = JMethodDeclList() )? "}"
+	{ return new ExtendingClassDecl(cn, scn, vl, ml); }
 }
 
-void VarDecl():
-{}
+ArrayList<VarDecl> JVarDeclList():
+{ VarDecl vd; ArrayList<VarDecl> vl = new ArrayList<VarDecl>(); }
 {
-	Type() <IDENTIFIER> ";"
+	vd = JVarDecl() { vl = new ArrayList<VarDecl>(); vl.add(vd); }
+	( LOOKAHEAD(2) vd = JVarDecl() { vl.add(vd); } )*
+	{ return vl; }
+}
+
+VarDecl JVarDecl():
+{ Type t; Identifier i; }
+{
+	t = JType() i = JIdentifier() ";"
+	{ return new VarDecl(t, i); }
+}
+
+ArrayList<MethodDecl> JMethodDeclList():
+{ MethodDecl md; ArrayList<MethodDecl> ml = new ArrayList<MethodDecl>(); }
+{
+	md = JMethodDecl() { ml = new ArrayList<MethodDecl>(); ml.add(md); }
+	( md = JMethodDecl() { ml.add(md); } )*
+	{ return ml; }
 }
 
 // Method declaration expansions
-void MethodDecl():
-{}
+MethodDecl JMethodDecl():
+{ 
+	Type t; 
+	Identifier i; 
+	Expression e;
+	ArrayList<Formal> fl = new ArrayList<Formal>(); 
+	ArrayList<VarDecl> vl = new ArrayList<VarDecl>(); 
+	ArrayList<Statement> sl = new ArrayList<Statement>(); 
+}
 {
-	"public" Type() <IDENTIFIER> "(" ( ParamDeclList() )? ")" "{"
-	( LOOKAHEAD(2) VarDecl() )* ( Statement() )*
-	"return" Expression() ";" "}"
+	"public" t = JType() i = JIdentifier() "(" ( fl = JParamDeclList() )? ")" "{"
+	( LOOKAHEAD(JVarDeclList()) vl = JVarDeclList() )? ( sl = JStatementList() )?
+	"return" e = JExpression() ";" "}"
+	{ return new MethodDecl(t, i, fl, vl, sl, e); }
 }
 
-void ParamDeclList():
-{}
+ArrayList<Formal> JParamDeclList():
+{ Formal f; ArrayList<Formal> fl = new ArrayList<Formal>(); }
 {
-	ParamDecl() ( ParamDeclListTail() )*
+	f = JParamDecl() { fl = new ArrayList<Formal>(); fl.add(f); } 
+	( f = JParamDeclListTail() { fl.add(f); } )*
+	{ return fl; }
 }
 
-void ParamDeclListTail():
-{}
+Formal JParamDeclListTail():
+{ Formal f; }
 {
-	"," ParamDecl()
+	"," f = JParamDecl()
+	{ return f; }
 }
 
-void ParamDecl():
-{}
+Formal JParamDecl():
+{ Type t; Identifier i; }
 {
-	Type() <IDENTIFIER>
+	t = JType() i = JIdentifier()
+	{ return new Formal( t, i); }
 }
 
-void Type():
-{}
+Type JType():
+{ Token t; }
 {
-	LOOKAHEAD(3) "int" "[" "]"
-	| "boolean"
-	| "int"
-	| <IDENTIFIER> 
+	LOOKAHEAD(3) "int" "[" "]" { return Type.THE_INT_ARRAY_TYPE; }
+	| "boolean" { return Type.THE_BOOLEAN_TYPE; }
+	| "int"	{ return new IntegerType(); } // Use the static variable in Type class instead>
+	| t = <IDENTIFIER> { return new IdentifierType(t.beginLine, t.beginColumn, t.image); }
+}
+
+ArrayList<Statement> JStatementList():
+{ Statement s; ArrayList<Statement> sl = new ArrayList<Statement>(); }
+{
+	s = JStatement() { sl = new ArrayList<Statement>(); sl.add(s); }
+	( s = JStatement() { sl.add(s); } )*
+	{ return sl; }
 }
 
 // Statement expansions
-void Statement():
-{}
+Statement JStatement():
+{ Statement s; }
 {
 	try {
 		(
-		Block()
-		| IfStatement()
-		| WhileStatement()
-		| PrintCall()
-		| LOOKAHEAD(2) Assignment()
-		| ArrayAssignment()
+		s = JBlock() { return s; }
+		| s = JIfStatement() { return s; } 
+		| s = JWhileStatement() { return s; }
+		| s = JPrintCall() { return s; }
+		| LOOKAHEAD(2) s = JAssignment() { return s; }
+		| s = JArrayAssignment() { return s; }
 		)
 	} catch(ParseException e) {
 		syntax_error(e);
 		skip_to_expected(e.expectedTokenSequences);
+		return new Block(new ArrayList<Statement>());
 	}
 }
 
-void Block():
-{}
+Block JBlock():
+{ ArrayList<Statement> sl = new ArrayList<Statement>(); }
 {	try {
-		"{" ( Statement() )* "}"
+		"{" ( sl = JStatementList() )? "}"
+		{ return new Block(sl); }
 	} catch(ParseException e){
 		syntax_error(e);
 		skip_to_expected(e.expectedTokenSequences);
+		return new Block(new ArrayList<Statement>());
 	}
 }
 
-void IfStatement():
-{}
+If JIfStatement():
+{ Token t; Expression e; Statement s1; Statement s2; }
 {/*
 	LOOKAHEAD(IfElseStatement()) IfElseStatement()
 	| IfThenStatement()	
@@ -190,139 +249,171 @@ void IfThenStatement():
 void IfElseStatement():
 {}
 {*/	
-	"if" "(" Expression() ")" Statement() "else" Statement()
+	t = <IF> "(" e = JExpression() ")" s1 = JStatement() "else" s2 = JStatement()
+	{ return new If(t.beginLine, t.beginColumn, e, s1, s2); } // Is this the right token position?
 }
 
-void WhileStatement():
-{}
+While JWhileStatement():
+{ Token t; Expression e; Statement s; }
 {
-	"while" "(" Expression() ")" Statement()
+	t = <WHILE> "(" e = JExpression() ")" s = JStatement()
+	{ return new While(t.beginLine, t.beginColumn, e, s); }
 }
 
-void PrintCall():
-{}
+Print JPrintCall():
+{ Token t; Expression e; }
 {
-	<PRINTLN> "(" Expression() ")" ";"
+	t = <PRINTLN> "(" e = JExpression() ")" ";"
+	{ return new Print(t.beginLine, t.beginColumn, e); }
 }
 
-void Assignment():
-{}
+Assign JAssignment():
+{ Token t; Identifier i; Expression e; }
 {
-	<IDENTIFIER> "=" Expression() ";"
+	i = JIdentifier() t = <GETS> e = JExpression() ";"
+	{ return new Assign(t.beginLine, t.beginColumn, i, e); } // Do I need to provide pos here>
 }
 
-void ArrayAssignment():
-{}
+ArrayAssign JArrayAssignment():
+{ Token t; Identifier i; Expression ie; Expression ae; }
 {
-	<IDENTIFIER> "[" Expression() "]" "=" Expression() ";"
+	i = JIdentifier() "[" ie = JExpression() "]" t = <GETS> ae = JExpression() ";"
+	{ return new ArrayAssign(t.beginLine, t.beginColumn, i, ie, ae); }
 }
 
 // Expression expansions
-void Expression():
-{}
+Expression JExpression():
+{ Expression e; }
 {
-	LOOKAHEAD(SubExpression() "&&") AndExpr()
-	| LOOKAHEAD(SubExpression() "<") CompareExpr()
-	| LOOKAHEAD(SubExpression() "+") PlusExpr()
-	| LOOKAHEAD(SubExpression() "-") MinusExpr()
-	| LOOKAHEAD(SubExpression() "*") MultExpr()
-	| LOOKAHEAD(SubExpression() "[") ArrayLookupExpr()
-	| LOOKAHEAD(SubExpression() "." "length") LengthExpr()
-	| LOOKAHEAD(SubExpression() "." <IDENTIFIER> "(" ) FunctionCall()
-	| SubExpression()
+	LOOKAHEAD(JSubExpression() "&&") e = JAndExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "<") e = JCompareExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "+") e = JPlusExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "-") e = JMinusExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "*") e = JMultExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "[") e = JArrayLookupExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "." "length") e = JLengthExpr() { return e; }
+	| LOOKAHEAD(JSubExpression() "." JIdentifier() "(" ) e = JFunctionCall() { return e; }
+	| e = JSubExpression() { return e; }
 }
 
-void AndExpr():
-{}
+And JAndExpr():
+{ Token t; Expression e1; Expression e2; }
 {
-	SubExpression() "&&" SubExpression()
+	e1 = JSubExpression() t = <AND> e2 = JSubExpression()
+	{ return new And(t.beginLine, t.beginColumn, e1, e2); }
 }
 
-void CompareExpr():
-{}
+LessThan JCompareExpr():
+{ Token t; Expression e1; Expression e2; }
 {
-	SubExpression() "<" SubExpression()
+	e1 = JSubExpression() t = <LESSTHAN> e2 = JSubExpression()
+	{ return new LessThan(t.beginLine, t.beginColumn, e1, e2); }
 }
 
-void PlusExpr():
-{}
+Plus JPlusExpr():
+{ Token t; Expression e1; Expression e2; }
 {
-	SubExpression() "+" SubExpression()
+	e1 = JSubExpression() t = <PLUS> e2 = JSubExpression()
+	{ return new Plus(t.beginLine, t.beginColumn, e1, e2); }
 }
 
-void MinusExpr():
-{}
-{	SubExpression() "-" SubExpression()
-
+Minus JMinusExpr():
+{ Token t; Expression e1; Expression e2; }
+{	e1 = JSubExpression() t = <MINUS> e2 = JSubExpression()
+	{ return new Minus(t.beginLine, t.beginColumn, e1, e2); }
 }
 
-void MultExpr():
-{}
+Times JMultExpr():
+{ Token t; Expression e1; Expression e2; }
 {
-	SubExpression() "*" SubExpression()
+	e1 = JSubExpression() t = <MULT> e2 = JSubExpression()
+	{ return new Times(t.beginLine, t.beginColumn, e1, e2); }
 }
 
-void ArrayLookupExpr():
-{}
+ArrayLookup JArrayLookupExpr():
+{ Token t; Expression e; Expression ie; }
 {
-	SubExpression() "[" SubExpression() "]"
+	e = JSubExpression() t = <LBRACKET> ie = JSubExpression() <RBRACKET>
+	{ return new ArrayLookup(t.beginLine, t.beginColumn, e, ie); }
 }
 
-void LengthExpr():
-{}
+ArrayLength JLengthExpr():
+{ Token t; Expression e; }
 {
-	SubExpression() "." "length"
+	e = JSubExpression() t = <DOT> "length"
+	{ return new ArrayLength(t.beginLine, t.beginColumn, e); }
 }
 
-void FunctionCall():
-{}
-{
-	SubExpression() "." <IDENTIFIER> "(" ( MethodParams() )? ")"
+Call JFunctionCall():
+{ Token t; Expression e; Identifier i; ArrayList<Expression> el = new ArrayList<Expression>(); }
+{// Does this use the identifier type class? Probably not.
+	e = JSubExpression() "." i = JIdentifier() t = <LPAREN> ( el = JMethodParams() )? <RPAREN>
+	{ return new Call(t.beginLine, t.beginColumn, e, i, el); }
 }
 
-void MethodParams():
-{}
+ArrayList<Expression> JMethodParams():
+{ Expression e; ArrayList<Expression> el = new ArrayList<Expression>(); }
 {
-	Expression() ( MethodParamsTail() )*
+	e = JExpression() { el = new ArrayList<Expression>(); el.add(e); }
+	( e = JMethodParamsTail() { el.add(e); }  )*
+	{ return el; }
 }
 
-void MethodParamsTail():
-{}
+Expression JMethodParamsTail():
+{ Expression e; }
 {
-	"," Expression()
+	"," e = JExpression() { return e; }
 }
 
-void SubExpression():
-{}
+Expression JSubExpression():
+{ Token t; Identifier i; IdentifierExp ie; Expression e; }
 {
-	<INTEGER_LITERAL>
-	| "true"
-	| "false"
-	| "this"
-	| LOOKAHEAD(2) "new" "int" "[" Expression() "]"
-	| "new" <IDENTIFIER> "(" ")"
-	| "!" Expression()
-	| "(" Expression() ")"
-	| <IDENTIFIER>
+	t = <INTEGER_LITERAL> 
+	{ return new IntegerLiteral(t.beginLine, t.beginColumn, Integer.parseInt(t.image));}
+	| t = <TRUE> { return new True(t.beginLine, t.beginColumn); }
+	| t = <FALSE> { return new False(t.beginLine, t.beginColumn); }
+	| t = <THIS> { return new This(t.beginLine, t.beginColumn); }
+	| LOOKAHEAD(2) e = JNewArray() { return e; } 
+	| t = <NEW> i = JIdentifier() "(" ")" { return new NewObject(t.beginLine, t.beginColumn, i); }
+	| t = <NOT> e = JExpression() { return new Not(t.beginLine, t.beginColumn, e); }
+	| "(" e = JExpression() ")" { return e; } // is this correct?
+	| ie = JIdentifierExp() { return ie; }
+}
+
+IdentifierExp JIdentifierExp():
+{ Token t; }
+{
+	t = <IDENTIFIER>
+	{ return new IdentifierExp(t.beginLine, t.beginColumn, t.image); }
+}
+
+Identifier JIdentifier():
+{ Token t; }
+{
+	t = <IDENTIFIER>
+	{ return new Identifier(t.beginLine, t.beginColumn, t.image); }
+}
+
+NewArray JNewArray():
+{ Token t; Expression e; }
+{
+	t = <NEW> "int" "[" e = JExpression() "]" 
+	{ return new NewArray(t.beginLine, t.beginColumn, e); }
 }
 
 JAVACODE
 void syntax_error(ParseException e){
 	Token t = e.currentToken.next;
 	int exp = -1;
-
-	errors = errors + 1;
 	
 	for(int i = 0; exp == -1 && i < e.expectedTokenSequences.length; i++)
 		for(int j = 0; exp == -1 && j < e.expectedTokenSequences[i].length; j++)
 			exp = e.expectedTokenSequences[i][j];
 	if (exp != -1)
-        	System.err.printf("%s:%03d.%03d: Syntax Error: expecting a %s\n",
-                	in_file, t.beginLine, t.beginColumn,
-			e.tokenImage[exp]);
+		CompileError.printError(t.beginLine, t.beginColumn,
+			String.format("Syntax Error: expecting a %s\n", e.tokenImage[exp]));
 	else
-		System.err.printf("%s:%03d.%03d: Syntax Error: unknown\n",
-                        in_file, t.beginLine, t.beginColumn);
+		CompileError.printError(t.beginLine, t.beginColumn, "Syntax Error: unknown");
 }
 
 JAVACODE
