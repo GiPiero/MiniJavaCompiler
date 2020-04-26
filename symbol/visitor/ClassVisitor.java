@@ -1,5 +1,6 @@
 package symbol.visitor;
 
+import symbol.type.ClassObject;
 import syntax.*;
 import main.CompileError;
 import symbol.SymbolTable;
@@ -58,12 +59,17 @@ public class ClassVisitor implements SyntaxTreeVisitor<Void> {
     }
 
     public Void visit (SimpleClassDecl cd) {
+        int i;
         scope = scope.sub_table.get(cd.i.s);
 
-        for(int i = 0; i < cd.vl.size(); i++)
+        for(i = 0; i < cd.vl.size(); i++) {
             cd.vl.get(i).accept(this);
+            scope.getBinding(cd.vl.get(i).i.s).offset = i;
+        }
 
-        for(int i = 0; i < cd.ml.size(); i++)
+        ((ClassObject) root.getBinding(cd.i.s).type).size = i;
+
+        for(i = 0; i < cd.ml.size(); i++)
             cd.ml.get(i).accept(this);
 
         scope = scope.parent;
@@ -71,6 +77,7 @@ public class ClassVisitor implements SyntaxTreeVisitor<Void> {
     }
 
     public Void visit (ExtendingClassDecl ecd) {
+        int i;
         // Check if base class has been defined
         // TODO: Replace with check whether exists in table
         Binding b = scope.getBinding(ecd.j.s);
@@ -80,9 +87,14 @@ public class ClassVisitor implements SyntaxTreeVisitor<Void> {
 
         scope = scope.sub_table.get(ecd.i.s);
 
-        for(int i = 0; i < ecd.vl.size(); i++)
+        for(i = 0; i < ecd.vl.size(); i++) {
             ecd.vl.get(i).accept(this);
-        for(int i = 0; i < ecd.ml.size(); i++)
+            scope.getBinding(ecd.vl.get(i).i.s).offset = i;
+        }
+
+        ((ClassObject) root.getBinding(ecd.i.s).type).size = i;
+
+        for(i = 0; i < ecd.ml.size(); i++)
             ecd.ml.get(i).accept(this);
 
         scope = scope.parent;
@@ -109,8 +121,10 @@ public class ClassVisitor implements SyntaxTreeVisitor<Void> {
             param_types.add(scope.getBinding(md.fl.get(i).i.s).type);
         }
 
-        for(int i = 0; i < md.vl.size(); i++)
+        for(int i = 0; i < md.vl.size(); i++) {
             md.vl.get(i).accept(this);
+            scope.getBinding(md.vl.get(i).i.s).offset = i;
+        }
 
         SymbolType t = ConvertType(md.t, md.i.s);
         Method m = new Method(md.i.s, t, param_types);

@@ -28,39 +28,59 @@ public class ExtendedClassVisitor implements SyntaxTreeVisitor {
 
     // TODO: handle class that extends main
     public Void visit (ExtendingClassDecl ecd) {
+        // Descend into this classes scope
         scope = scope.sub_table.get(ecd.i.s);
+
+        // Get the scope and id for the base class
         SymbolTable base_scope = root.sub_table.get(ecd.j.s);
         String base_id = base_scope.id;
 
         if(base_scope == null) return null;
 
+        // Iterate up through parent classes
         while(base_id != null){
+            // Iterate through the base class' bindings and add them to this class
             for(String id : base_scope.table.keySet()){
                 if(!scope.table.containsKey(id)){
                     scope.addBinding(id, base_scope.getBinding(id));
-                    scope.complete = true;
+                    //scope.complete = true; // Mark this class as complete (What if parents have nothing?)
                     continue;
                 }
 
+                // Check to see if method declaration matches parent method declaration.
                 SymbolType t1 = base_scope.getBinding(id).type;
                 if(t1 instanceof Method) {
                     t1 = (Method) t1; // Necissary?
                     Method t2 = (Method) scope.getBinding(id).type;
                     if(!t1.canBeAssignedBy(t2)){
                         CompileError.printError(ecd.i.lineNumber, ecd.i.columnNumber,
-                                String.format("Error: in class %s method %s has type mismatch with parent method.", scope.id, id));
+                                String.format("Error: in class %s method %s has type mismatch with parent method.",
+                                        scope.id, id));
                         scope.table.get(id).type = Primitive.UNDEFINED;
                         continue;
                     }
                 }
             }
 
+            // Update the size of this ClassObject and offsets of locals
+            int parent_size = ((ClassObject) root.getBinding(base_id).type).size;
+            ((ClassObject) root.getBinding(ecd.i.s).type).size += parent_size;
+            for(VarDecl v : ecd.vl)
+                scope.getBinding(v.i.s).offset += parent_size;
+
+            // If the base scope has been fully updated break
             if(base_scope.complete == true) break;
+
+            // Get the scope parent to the base class. If it does not exist, break.
             ClassObject parent_class = (ClassObject) root.table.get(base_id).type;
             if(parent_class.base == null) break;
             base_id = parent_class.base;
             base_scope = root.sub_table.get(parent_class.base);
         }
+
+
+        // Return to parent scope
+        scope.complete = true; // Mark this class as complete
         scope = scope.parent;
         return null;
     }

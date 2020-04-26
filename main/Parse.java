@@ -1,6 +1,9 @@
 package main;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
+
+import frame.Access;
 import parser.MiniJavaParser;
 import parser.ParseException;
 import parser.Token;
@@ -8,9 +11,13 @@ import static parser.MiniJavaParserConstants.EOF;
 import static parser.MiniJavaParserConstants.INVALID;
 import global.FieldNames;
 import main.CompileError;
+import sparc.SPARCFrame;
 import syntax.Program;
 import symbol.SymbolTableBuilder;
 import symbol.SymbolTable;
+import translate.Fragment;
+import translate.TranslateVisitor;
+import tree.NameOfLabel;
 
 public class Parse {
     public static void main(String [] args) {
@@ -65,6 +72,15 @@ public class Parse {
         SymbolTable st = st_builder.buildSymbolTable(program);
 
         System.out.println("filename=" + in_file + ", errors=" + CompileError.errors);
+
+        // Translate to IR tree
+        TranslateVisitor tv 
+        = new TranslateVisitor(st,
+                new SPARCFrame(new NameOfLabel("factory"), new ArrayList<Access>()));
+        tv.visit(program);
+        for(Fragment f : tv.fragments){
+            f.print();
+        }
     }
 
     public static void lexical_analysis(MiniJavaParser parser, String in_file, boolean verbose) {

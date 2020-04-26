@@ -1,11 +1,15 @@
 package symbol.type;
 import java.util.ArrayList;
+import java.util.Hashtable;
+
+import frame.Access;
 import symbol.type.SymbolType;
 
 public class Method extends SymbolType {
     public String id;
     public SymbolType return_type;
     public ArrayList<SymbolType> param_types;
+    public Hashtable<String, Access> accesses = new Hashtable<String, Access>();
 
     public Method(String id, SymbolType return_type, ArrayList<SymbolType> param_types) {
         this.id = id;

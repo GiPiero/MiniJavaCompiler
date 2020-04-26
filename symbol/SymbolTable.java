@@ -1,5 +1,7 @@
 package symbol;
 import java.util.Hashtable;
+
+import frame.Access;
 import symbol.type.Primitive;
 
 public class SymbolTable {

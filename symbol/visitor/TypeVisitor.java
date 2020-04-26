@@ -281,6 +281,8 @@ public class TypeVisitor implements SyntaxTreeVisitor<SymbolType> {
             //return Primitive.UNDEFINED; // TODO: this is a hack. remove and fix
         }
 
+        c.setReceiverClassName(((ClassObject) t).id);
+
         SymbolTable ct = root.sub_table.get(((ClassObject) t).id);
         Binding mb = ct.getBinding(c.i.s);
         rt = mb.type;

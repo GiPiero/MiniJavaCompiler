@@ -14,7 +14,7 @@ public class Primitive extends SymbolType {
     private Primitive(String str){ this.str = str; }
 
     @Override
-    public boolean isSame(SymbolType t) { return t == this; } 
+    public boolean isSame(SymbolType t) { return t == this; }
 
     @Override
     public boolean canBeAssignedBy(SymbolType t) { return t == this; }

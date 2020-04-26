@@ -6,6 +6,7 @@ import symbol.type.ClassObject;
 import symbol.type.SymbolType;
 
 public class ClassObject extends SymbolType {
+    public int size = 0;
     public String base;
     public String id;
     public SymbolTable table;
