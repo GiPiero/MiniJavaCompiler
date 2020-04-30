@@ -4,8 +4,8 @@ import frame.Frame;
 import tree.Stm;
 
 public class Fragment {
-    private Frame frame;
-    private Stm body;
+    public Frame frame;
+    public Stm body;
 
     public Fragment(Frame frame, Stm body){
         this.frame = frame;
@@ -13,7 +13,7 @@ public class Fragment {
     }
 
     public void print(){
-        System.out.println(frame.inst_ptr.toString());
+        System.out.println();
         System.out.println(body.toString());
     }
 }

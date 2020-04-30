@@ -1,8 +1,9 @@
 package main;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.*;
 import java.util.ArrayList;
+import java.util.List;
 
+import assem.Instruction;
 import frame.Access;
 import parser.MiniJavaParser;
 import parser.ParseException;
@@ -11,16 +12,20 @@ import static parser.MiniJavaParserConstants.EOF;
 import static parser.MiniJavaParserConstants.INVALID;
 import global.FieldNames;
 import main.CompileError;
+import sparc.CodeGen;
 import sparc.SPARCFrame;
 import syntax.Program;
 import symbol.SymbolTableBuilder;
 import symbol.SymbolTable;
 import translate.Fragment;
 import translate.TranslateVisitor;
+import tree.LABEL;
 import tree.NameOfLabel;
+import canon.Main;
+import tree.Stm;
 
 public class Parse {
-    public static void main(String [] args) {
+    public static void main(String [] args) throws IOException{
         final MiniJavaParser parser;
         final boolean verbose;
         final String in_file;
@@ -43,8 +48,7 @@ public class Parse {
         CompileError.errors = 0;
 
         // Init parser
-        try { parser = new MiniJavaParser (new FileInputStream(in_file));}
-        catch (Exception e) { System.out.println(e); return; }
+        parser = new MiniJavaParser (new FileInputStream(in_file));
 
         // Enable parser debug output
         if (verbose) parser.enable_tracing();
@@ -73,14 +77,44 @@ public class Parse {
 
         System.out.println("filename=" + in_file + ", errors=" + CompileError.errors);
 
+        if(CompileError.errors !=0)
+            return;
+
         // Translate to IR tree
-        TranslateVisitor tv 
-        = new TranslateVisitor(st,
+        TranslateVisitor tv = new TranslateVisitor(st,
                 new SPARCFrame(new NameOfLabel("factory"), new ArrayList<Access>()));
+
         tv.visit(program);
+
+        FileWriter fwS = null;
+        FileWriter fwV = null;
+        fwS = new FileWriter(in_file.split("\\.")[0] + ".s");
+        if(verbose) fwV = new FileWriter("debug08.txt");
+
         for(Fragment f : tv.fragments){
-            f.print();
+            ArrayList<Instruction> instlist = new ArrayList<>();
+            List<Stm> stm_list = Main.transform(f.body);
+            CodeGen cg = new CodeGen((SPARCFrame) f.frame);
+            for(Stm s : stm_list) {
+                if(verbose) {
+                    if (s instanceof LABEL)
+                        fwV.write("\n");
+                    fwV.write(s.toString());
+                }
+                instlist = cg.codegen(s);
+
+            }
+            for(Instruction inst : f.frame.procEntryExit3(instlist)){
+                try {
+                    fwS.write(inst.format() + "\n");
+                } catch (IOException e) {
+                    System.err.println("ERROR:main: IOException: " + e.toString());
+                    return;
+                }
+            }
         }
+        try { fwS.close(); if(verbose) fwV.close();}
+        catch (IOException e) { System.err.println("ERROR:main: IOException: " + e.toString()); }
     }
 
     public static void lexical_analysis(MiniJavaParser parser, String in_file, boolean verbose) {

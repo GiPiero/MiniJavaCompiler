@@ -31,7 +31,7 @@ public class TranslateVisitor implements SyntaxTreeVisitor<IRTree>{
 
     /* Helper functions */
     //private static IRTree plus
-    //private static IRTree mul
+    //private static IRTree mul (def do this)
     private void addFragment(Frame frame, IRTree body){
         fragments.add(new Fragment(frame, frame.procEntryExit1(body.asStm())));
     }
@@ -71,11 +71,12 @@ public class TranslateVisitor implements SyntaxTreeVisitor<IRTree>{
     public IRTree visit (MainClass m){
         currClass= (ClassObject) scope.table.get(m.i1.s).type;
         scope = scope.sub_table.get(m.i1.s);
+        Frame newFrame = factory.newFrame(
+                new NameOfLabel("main"),
+                new ArrayList());
         addFragment(
-                factory.newFrame(
-                        new NameOfLabel("main"),
-                        new ArrayList()),
-                m.s.accept(this));
+                newFrame,
+                new StmIR(new SEQ(new SEQ(new LABEL("main"), m.s.accept(this).asStm()), new JUMP(newFrame.epilogueLabel))));
         scope = scope.parent;
         currClass = null;
         return null;
@@ -124,13 +125,14 @@ public class TranslateVisitor implements SyntaxTreeVisitor<IRTree>{
         NameOfLabel name = new NameOfLabel(scope.id, n.i.s);
         Frame newFrame = factory.newFrame(name, params);
         currFrame = newFrame;
+        currMethod.accesses.put("this", newFrame.formals.get(0));
         for(int i = 0; i < n.fl.size(); i++)
-            currMethod.accesses.put(n.fl.get(i).i.s, newFrame.formals.get(i));
+            currMethod.accesses.put(n.fl.get(i).i.s, newFrame.formals.get(i+1));
 
         scope = scope.sub_table.get(n.i.s);
 
         for(VarDecl v : n.vl)
-            currMethod.accesses.put(v.i.s, newFrame.allocLocal(false)); // set this to true at some point
+            currMethod.accesses.put(v.i.s, newFrame.allocLocal(false));
 
         Exp retExp;
         if(n.sl.size() > 0){
@@ -141,7 +143,8 @@ public class TranslateVisitor implements SyntaxTreeVisitor<IRTree>{
         }
         else retExp = n.e.accept(this).asExp();
 
-        fragments.add(new Fragment(newFrame, newFrame.procEntryExit1(new MOVE(new TEMP(newFrame.rv()), retExp))));
+        fragments.add(new Fragment(newFrame, newFrame.procEntryExit1(
+                new SEQ(new SEQ(new LABEL(name), new MOVE(new TEMP(newFrame.rv()), retExp)), new JUMP(newFrame.epilogueLabel)))));
         scope = scope.parent;
         currMethod = null;
         currFrame = null;

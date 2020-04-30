@@ -1,5 +1,6 @@
 package frame;
 
+import assem.Instruction;
 import frame.Access;
 import tree.Stm;
 import tree.NameOfTemp;
@@ -16,4 +17,7 @@ public abstract class Frame {
     public abstract NameOfTemp rv();
     public abstract int wordSize();
     public abstract Stm procEntryExit1(Stm body);
+    public abstract ArrayList<Instruction> procEntryExit3(ArrayList<Instruction> body);
+
+    public NameOfLabel epilogueLabel; // this is a dirty hack probably
 }

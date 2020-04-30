@@ -4,12 +4,12 @@ SUPPORT := support.jar
 
 default	:	compiler
 
-compiler:	translate.jar
+compiler:	select.jar
 
 parser.jj:
 	$(JAVACC) -OUTPUT_DIRECTORY=parser parser/*.jj
 
-translate.jar: parser.jj
+select.jar: parser.jj
 	$(JAVAC) -classpath .:$(SUPPORT) global/*.java
 	$(JAVAC) -classpath .:$(SUPPORT) main/*.java
 	$(JAVAC) -classpath .:$(SUPPORT) parser/*.java
@@ -30,7 +30,7 @@ clean:
 	-/bin/rm -f */*.class
 	-/bin/rm -f symbol/*/*.class
 	-/bin/rm -f translate/*/*.class
-	-/bin/rm -f translate.jar
+	-/bin/rm -f select.jar
 
 clean_all: clean
 	-/bin/rm -f parser/*.java
