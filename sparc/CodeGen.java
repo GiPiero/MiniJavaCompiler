@@ -3,6 +3,7 @@ package sparc;
 import assem.Instruction;
 
 import assem.LabelInstruction;
+import assem.MoveInstruction;
 import assem.OperationInstruction;
 import tree.*;
 
@@ -28,7 +29,7 @@ public class CodeGen {
     private NameOfTemp getTemp(){
         tempsUsed++;
         if(tempsUsed >= tmpTemps.size()){
-            NameOfTemp newTemp = new NameOfTemp("r"+tempsUsed);
+            NameOfTemp newTemp = new NameOfTemp("tmp"+tempsUsed);
             tmpTemps.add(newTemp);
             return newTemp;
         }
@@ -67,7 +68,7 @@ public class CodeGen {
                 final int val = ((CONST) s.src).value;
 
                 if (isImmediateSize(val))
-                    instList.add(new OperationInstruction("\tmov\t" + val + ", `d0", dst.temp, null));
+                    instList.add(new MoveInstruction("\tmov\t" + val + ", `d0", dst.temp, null));
                 else {
                     instList.add(new OperationInstruction("\tsethi\t%hi(" + val + "), `d0", dst.temp, null));
                     instList.add(new OperationInstruction("\tor\t`s0, %lo(" + val + "), `d0", dst.temp, dst.temp));
@@ -77,21 +78,21 @@ public class CodeGen {
                 final MEM src = (MEM) s.src;
 
                 if(src.exp instanceof BINOP &&
-                    (((BINOP) src.exp).binop == BINOP.PLUS
-                    || ((BINOP) src.exp).binop == BINOP.MINUS)){
+                        (((BINOP) src.exp).binop == BINOP.PLUS
+                                || ((BINOP) src.exp).binop == BINOP.MINUS)){
                     final BINOP exp = (BINOP) src.exp;
                     final String op = (exp.binop == BINOP.PLUS)? "+" : "-";
 
                     if(exp.left instanceof  CONST && isImmediateSize(((CONST)exp.left).value)){
-                       final int val = ((CONST)exp.left).value;
-                       instList.add(new OperationInstruction("\tld\t[`s0 "+op+" "+val+"], `d0",
-                               dst.temp, munchExp(exp.right, getTemp())));
-                       freeTemps(1);
+                        final int val = ((CONST)exp.left).value;
+                        instList.add(new OperationInstruction("\tld\t[`s0 "+op+" "+val+"], `d0",
+                                dst.temp, munchExp(exp.right, getTemp())));
+                        freeTemps(1);
                     }
                     else if(exp.right instanceof  CONST && isImmediateSize(((CONST)exp.right).value)){
                         final int val = ((CONST)exp.right).value;
                         instList.add(new OperationInstruction("\tld\t[`s0 "+op+" "+val+"], `d0",
-                                dst.temp, munchExp(exp.right, getTemp())));
+                                dst.temp, munchExp(exp.left, getTemp())));
                         freeTemps(1);
                     }
                     else {
@@ -107,7 +108,7 @@ public class CodeGen {
                 }
             }
             else {
-                instList.add(new OperationInstruction("\tmov\t`s0, `d0",
+                instList.add(new MoveInstruction("\tmov\t`s0, `d0",
                         dst.temp, munchExp(s.src, getTemp())));
                 freeTemps(1);
             }
@@ -116,8 +117,8 @@ public class CodeGen {
             final MEM ptr = (MEM) s.dst;
 
             if (ptr.exp instanceof BINOP &&
-                (((BINOP) ptr.exp).binop == BINOP.PLUS
-                || ((BINOP) ptr.exp).binop == BINOP.MINUS)) {
+                    (((BINOP) ptr.exp).binop == BINOP.PLUS
+                            || ((BINOP) ptr.exp).binop == BINOP.MINUS)) {
                 final BINOP exp = (BINOP) ptr.exp;
                 final String op = (exp.binop == BINOP.PLUS) ? "+" : "-";
 
@@ -198,25 +199,28 @@ public class CodeGen {
                     (NameOfTemp) null, munchExp(s.left, getTemp()), munchExp(s.right, getTemp())));
             freeTemps(2);
         }
+        final ArrayList<NameOfLabel> jumpList = new ArrayList<>();
+        jumpList.add(s.iftrue);
+        jumpList.add(s.iffalse);
 
         if(s.relop == CJUMP.EQ)
             instList.add(new OperationInstruction("\tbe\t`j0",
-                    new ArrayList<>(), new ArrayList<>(), Arrays.asList(s.iftrue)));
+                    new ArrayList<>(), new ArrayList<>(), jumpList));
         else if(s.relop == CJUMP.NE)
             instList.add(new OperationInstruction("\tbne\t`j0",
-                    new ArrayList<>(), new ArrayList<>(), Arrays.asList(s.iftrue)));
+                    new ArrayList<>(), new ArrayList<>(), jumpList));
         else if(s.relop == CJUMP.LT)
             instList.add(new OperationInstruction("\tbl\t`j0",
-                    new ArrayList<>(), new ArrayList<>(), Arrays.asList(s.iftrue)));
+                    new ArrayList<>(), new ArrayList<>(), jumpList));
         else if(s.relop == CJUMP.GT)
             instList.add(new OperationInstruction("\tbg\t`j0",
-                    new ArrayList<>(), new ArrayList<>(), Arrays.asList(s.iftrue)));
+                    new ArrayList<>(), new ArrayList<>(), jumpList));
         else if(s.relop == CJUMP.LE)
             instList.add(new OperationInstruction("\tble\t`j0",
-                    new ArrayList<>(), new ArrayList<>(), Arrays.asList(s.iftrue)));
+                    new ArrayList<>(), new ArrayList<>(), jumpList));
         else if(s.relop == CJUMP.GE)
             instList.add(new OperationInstruction("\tbge\t`j0",
-                    new ArrayList<>(), new ArrayList<>(), Arrays.asList(s.iftrue)));
+                    new ArrayList<>(), new ArrayList<>(), jumpList));
 
         instList.add(new OperationInstruction("\tnop"));
     }
@@ -234,7 +238,7 @@ public class CodeGen {
 
     private NameOfTemp munchExp(CONST e, NameOfTemp r){
         if(isImmediateSize(e.value))
-            instList.add(new OperationInstruction("\tmov\t"+e.value+", `d0", r, null));
+            instList.add(new MoveInstruction("\tmov\t"+e.value+", `d0", r, null));
         else{
             instList.add(new OperationInstruction("\tsethi\t%hi("+e.value+"), `d0", r, null));
             instList.add(new OperationInstruction("\tor\t`s0, %lo("+e.value+"), `d0", r, r));
@@ -292,8 +296,8 @@ public class CodeGen {
 
     private NameOfTemp munchExp(MEM e, NameOfTemp r){
         if(e.exp instanceof BINOP &&
-            (((BINOP) e.exp).binop == BINOP.PLUS
-            || ((BINOP) e.exp).binop == BINOP.MINUS)) {
+                (((BINOP) e.exp).binop == BINOP.PLUS
+                        || ((BINOP) e.exp).binop == BINOP.MINUS)) {
             final BINOP exp = (BINOP) e.exp;
             final String op = (exp.binop == BINOP.PLUS) ? "+" : "-";
 
@@ -323,7 +327,7 @@ public class CodeGen {
     private NameOfTemp munchExp(CALL e, NameOfTemp r){
         int numArgs = 0;
         for(int i = 0; i < e.UNUSEDargs.size() && i < 6; i++) {
-            instList.add(new OperationInstruction("\tmov\t`s0, `d0",
+            instList.add(new MoveInstruction("\tmov\t`s0, `d0",
                     frame.outArgs[i], munchExp(e.UNUSEDargs.get(i), frame.outArgs[i])));
         }
         instList.add(new OperationInstruction("\tcall `j0",

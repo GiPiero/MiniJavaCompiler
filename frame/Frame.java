@@ -6,10 +6,12 @@ import tree.Stm;
 import tree.NameOfTemp;
 import tree.NameOfLabel;
 import java.util.ArrayList;
+import java.util.HashMap;
+
 public abstract class Frame {
     public final NameOfLabel inst_ptr;
     public final ArrayList<Access> formals;
-    
+
     public Frame(NameOfLabel i, ArrayList<Access> f) { inst_ptr = i; formals = f; }
     public abstract Frame newFrame(NameOfLabel name, ArrayList<Boolean> formals);
     public abstract Access allocLocal(boolean escapes);
@@ -20,4 +22,11 @@ public abstract class Frame {
     public abstract ArrayList<Instruction> procEntryExit3(ArrayList<Instruction> body);
 
     public NameOfLabel epilogueLabel; // this is a dirty hack probably
+
+    public final HashMap<NameOfTemp,String> tempMap = new HashMap<NameOfTemp,String>() {
+        @java.lang.Override
+        public String get(Object t) {
+            if (containsKey(t)) return super.get(t); else return t.toString();
+        }
+    };
 }
